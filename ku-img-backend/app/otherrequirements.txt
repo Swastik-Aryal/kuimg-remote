@@ -1,0 +1,10 @@
+pandas
+scipy
+matplotlib
+gensim
+plotly
+wordcloud
+scikit-learn
+numpy
+nltk
+#vue-plotly

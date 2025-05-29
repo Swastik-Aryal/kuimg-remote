@@ -1,0 +1,40 @@
+fastapi
+pandas
+numpy
+icrawler
+python-multipart
+tensorflow==2.15.0
+# keras
+uvicorn
+aiofiles
+redis
+boto3
+Jinja2
+requests
+scikit-learn
+matplotlib
+beautifulsoup4
+lxml
+# added by shishir
+pandas
+scipy
+matplotlib
+gensim
+plotly
+wordcloud
+scikit-learn
+numpy
+opencv-python
+tqdm
+
+#For PDF and image processing
+pdfplumber
+nltk
+yake
+
+#for new crawler
+ImageHash
+Pillow
+Requests
+selenium
+webdriver-manager

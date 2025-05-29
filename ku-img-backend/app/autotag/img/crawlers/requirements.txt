@@ -1,0 +1,5 @@
+ImageHash
+Pillow
+Requests
+selenium
+webdriver_manager

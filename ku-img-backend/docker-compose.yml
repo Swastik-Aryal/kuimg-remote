@@ -1,0 +1,63 @@
+version: '3'
+
+volumes :
+    redis-fs-vol : 
+
+services:
+    traefik : 
+        image : traefik:v2.5.2
+        command : 
+            # - "--log.level=DEBUG"
+            
+            # Traefik will listen on port 8080 by default for API request.
+            - "--api.insecure=true"
+
+            # Enabling docker provider
+            - "--providers.docker=true"
+
+            # Do not expose containers unless explicitly told so
+            - "--providers.docker.exposedbydefault=false"
+
+            # Traefik will listen to incoming request on the port 80 (HTTP)
+            - "--entrypoints.web.address=:80"
+        ports : 
+            - "80:80"       # HTTP Port
+            - "8080:8080"   # The Web UI
+        volumes : 
+            # Access to Docker socket so that Traefik can listen to the Docker events
+            - /var/run/docker.sock:/var/run/docker.sock
+
+    redis-fs : 
+        image : redis:7.0.7-alpine3.17
+        ports : 
+            - "6379:6379"
+        volumes : 
+            - ./redis-fs-vol:/data
+        # restart : always
+        restart: "${DOCKER_RESTART_POLICY:-unless-stopped}"
+        stop_grace_period: "${DOCKER_STOP_GRACE_PERIOD:-3s}"
+
+
+    kuimg-dev :
+        build :
+            context : ./
+        deploy : 
+            replicas : 1
+        restart : always
+        env_file : 
+            - ./env/kuimg.env
+        depends_on : 
+            - redis-fs
+        environment : 
+            - PYTHONUNBUFFERED=1
+            - LOG_LEVEL=DEBUG
+        labels : 
+            # Explicitly tell Traefik to expose this container
+            - "traefik.enable=true"
+
+            # The domain the service will respond to
+            # - "traefik.http.routers.accounts-dev.rule=HostRegexp(`crwaling.nsdai.org`)"
+            - "traefik.http.routers.accounts-dev.rule=HostRegexp(`localhost`)"
+
+            # Allow request only from the predefined entry point named "web"
+            - "traefik.http.routers.accounts-dev.entrypoints=web"

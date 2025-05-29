@@ -1,0 +1,15 @@
+/backup
+/rough
+/ref
+/test
+/dataset
+/app/dynamic_inx/PreTrainedW2V_model/
+/utils/data/
+redis-fs-vol/
+__pycache__/
+/app/dynamic_inx/Data_FT_w2v/FinetunedW2Vmodels
+/local_env.ps1
+/kuimg_env
+/app/data/
+/app/temp/
+/app/models/WGAN-GP/

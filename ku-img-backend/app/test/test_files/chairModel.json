@@ -1,0 +1,14 @@
+{
+    "tags": [
+        "other",
+        "chair"
+    ],
+    "img_dim": [
+        64,
+        64
+    ],
+    "training_size": 797,
+    "training_epochs": 25,
+    "testing_size": 200,
+    "testing_acc": 0.7300000190734863
+}
