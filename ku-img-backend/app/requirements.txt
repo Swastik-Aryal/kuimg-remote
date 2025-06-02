@@ -1,40 +1,35 @@
-fastapi
-pandas
-numpy
-icrawler
-python-multipart
+fastapi==0.115.12
+pandas==2.2.3
+numpy==1.26.4
+icrawler==0.6.10
+python-multipart==0.0.20
 tensorflow==2.15.0
 # keras
-uvicorn
-aiofiles
-redis
-boto3
-Jinja2
-requests
-scikit-learn
-matplotlib
-beautifulsoup4
-lxml
+uvicorn==0.34.1
+aiofiles==24.1.0
+redis==5.2.1
+boto3==1.37.37
+Jinja2==3.1.6
+requests==2.32.3
+scikit-learn==1.6.1
+matplotlib==3.9.4
+beautifulsoup4==4.13.4
+lxml==5.3.2
 # added by shishir
-pandas
-scipy
-matplotlib
-gensim
-plotly
-wordcloud
-scikit-learn
-numpy
-opencv-python
-tqdm
+scipy==1.13.1
+gensim==4.3.3
+plotly==6.0.1
+wordcloud==1.9.4
+opencv-python==4.11.0.86
+tqdm==4.67.1
 
 #For PDF and image processing
-pdfplumber
-nltk
-yake
+pdfplumber==0.11.6
+nltk==3.9.1
+yake==0.4.8
 
 #for new crawler
-ImageHash
-Pillow
-Requests
-selenium
-webdriver-manager
+ImageHash==4.3.1
+pillow==10.4.0
+selenium==4.31.0
+undetected_chromedriver

@@ -27,13 +27,25 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Google Chrome
-RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - && \
-    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
-    apt-get update && apt-get install -y google-chrome-stable && \
+# Install Google Chrome stable
+RUN curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | \
+    gpg --dearmor -o /usr/share/keyrings/google.gpg && \
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
+    > /etc/apt/sources.list.d/google.list && \
+    apt-get update && apt-get install -y --no-install-recommends google-chrome-stable && \
     rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages/
+# Install ChromeDriver matching installed Chrome version
+RUN set -eux; \
+    CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+' | head -1); \
+    DRIVER_URL="https://googlechromelabs.github.io/chrome-for-testing/latest-patch-versions-per-build-with-downloads.json"; \
+    DRIVER_VERSION=$(curl -s "$DRIVER_URL" | python3 -c "import sys,json; data=json.load(sys.stdin); print(data['builds']['$CHROME_VERSION']['downloads']['chromedriver'][0]['url'])" 2>/dev/null || \
+    curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION%.*}" | xargs -I {} echo "https://chromedriver.storage.googleapis.com/{}/chromedriver_linux64.zip"); \
+    wget -O /tmp/chromedriver.zip "$DRIVER_VERSION"; \
+    unzip /tmp/chromedriver.zip -d /tmp; \
+    mv /tmp/chromedriver*/chromedriver /usr/local/bin/ || mv /tmp/chromedriver /usr/local/bin/; \
+    chmod +x /usr/local/bin/chromedriver; \
+    rm -rf /tmp/chromedriver*
 
 # INSTALL REQUIREMENTS
 COPY ./app/requirements.txt /opt/app/requirements.txt

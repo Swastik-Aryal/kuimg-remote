@@ -2,4 +2,4 @@ ImageHash
 Pillow
 Requests
 selenium
-webdriver_manager
+undetected_chromedriver
