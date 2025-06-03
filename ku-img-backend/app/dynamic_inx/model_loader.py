@@ -43,5 +43,5 @@ import matplotlib.pyplot as plt
 
 
 #model = KeyedVectors.load_word2vec_format('app/dynamic_inx/PreTrainedW2V_model/GoogleNews-vectors-negative300.bin', binary=True)
-model = KeyedVectors.load_word2vec_format('dynamic_inx/PreTrainedW2V_model/GoogleNews-vectors-negative300.bin', binary=True)
-my_loaded_model = model
+# model = KeyedVectors.load_word2vec_format('dynamic_inx/PreTrainedW2V_model/GoogleNews-vectors-negative300.bin', binary=True)
+# my_loaded_model = model

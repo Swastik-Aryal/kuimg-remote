@@ -20,6 +20,12 @@
           <p>{{ file.name }}</p>
         </div>
 
+        <!-- ZIP preview if a ZIP file is uploaded -->
+        <div v-else-if="file && fileType === 'application/zip,application/x-zip-compressed,application/octet-stream'" class="filePreview">
+          <span class="fa fa-file-zip-o" style="font-size: 72px; margin-bottom: 10px;"></span>
+          <p>{{ file.name }}</p>
+        </div>
+
         <!-- Drop zone for file upload -->
         <div v-if="!file" style="display: flex; justify-content: center; width: full;">
           <div :class="['dropZone', dragging ? 'dropZone-over' : '']" @dragenter="dragging = true" @dragleave="dragging = false">
@@ -62,7 +68,7 @@
 export default {
   name: 'FileUpload',
   props: {
-    // Accepted file types (e.g., 'image/*', 'application/pdf')
+    // Accepted file types (e.g., 'image/*', 'application/pdf', 'application/zip')
     fileType: {
       type: String,
       required: true,
@@ -92,13 +98,16 @@ export default {
         return [];
       }
       return this.fileType
-        .split(',')
+        .split(' ')
         .map((type) => {
           if (type === 'image/*') {
             return 'jpg, png, jpeg';
           }
           if (type === 'application/pdf') {
             return 'pdf';
+          }
+          if (type === 'application/zip,application/x-zip-compressed,application/octet-stream' ) {
+            return 'zip';
           }
           const parts = type.split('/');
           if (parts.length === 2) {

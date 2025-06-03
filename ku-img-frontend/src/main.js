@@ -5,7 +5,7 @@ import store from './store'
 import axios from 'axios'
 
 axios.interceptors.request.use((config) => {
-    config.baseURL = 'http://localhost'
+    config.baseURL = 'http://autoimgtag.nsdai.org/api'
     // config.headers['leel'] = 'ram'
     config.url = config.url.replace('https://', 'http://')
     return config
