@@ -1050,7 +1050,7 @@ async def upload_pdf(file: UploadFile = File(...)):
         tmp_path = tmp.name
 
     print("Pdf temporarily saved at ", tmp_path)
-    keyword_data = extract_keywords_from_pdf(tmp_path, numOfKeywords=3)
+    keyword_data = extract_keywords_from_pdf(tmp_path, numOfKeywords=5)
 
     if os.path.exists(tmp_path):
         os.remove(tmp_path)

@@ -121,6 +121,7 @@ def extract_keywords_from_pdf(
     # Preprocess the text
     processed_text = preprocess_text(text)
 
+    keywords_to_xtract = 20 if numOfKeywords <= 10 else numOfKeywords * 2
     # Extract keywords using YAKE
     keywords = keyword_extractor(
         processed_text,
@@ -129,7 +130,7 @@ def extract_keywords_from_pdf(
         deduplication_threshold,
         deduplication_algo,
         windowSize,
-        numOfKeywords * 2,
+        keywords_to_xtract
     )
 
     # Filter keywords based on concreteness scores
