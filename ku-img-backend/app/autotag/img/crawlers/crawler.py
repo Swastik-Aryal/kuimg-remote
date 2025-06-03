@@ -197,7 +197,7 @@ class Crawler:
         else:
             self.make_dir(self.download_path, self.skip)
             tasks.append([self.keyword, Sites.GOOGLE])
-            tasks.append([self.keyword, Sites.NAVER])
+            # tasks.append([self.keyword, Sites.NAVER])
             # tasks.append([self.keyword, Sites.NATE])
 
         try:
