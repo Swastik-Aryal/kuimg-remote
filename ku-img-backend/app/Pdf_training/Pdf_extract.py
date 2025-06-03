@@ -54,7 +54,7 @@ def filter_keywords(keywords, file_path, numofkeywords=10):
     # Filter candidates based on concreteness scores
     concreteness_dict = {}
     keywords_candidates = [
-        kw[0] for kw in keywords if kw[0] != "percent"
+        kw[0] for kw in keywords
     ]  # Extract keyword strings from YAKE results
 
     # Open the file and process concreteness scores
@@ -130,7 +130,7 @@ def extract_keywords_from_pdf(
         deduplication_threshold,
         deduplication_algo,
         windowSize,
-        keywords_to_xtract
+        keywords_to_xtract,
     )
 
     # Filter keywords based on concreteness scores
