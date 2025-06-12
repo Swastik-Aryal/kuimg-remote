@@ -1,64 +1,64 @@
 <template>
-  <!-- Main container with background color -->
-  <div id="app" style="background-color: #fcfaff;">
-    <!-- Centered container for the file upload component -->
-    <div style="padding: 30px; display: flex; justify-content: center;">
-      <!-- Card-like container with border and padding -->
-      <div style="border-radius: 10px; width: full; border: 1px solid #eee; background-color: white; padding: 15px;">
-        
-        <!-- Title of the file uploader -->
-        <div style="margin-top: 10px; color:#c73c8be2; font-size:x-large; font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;">
-          {{ title }}
-        </div>
+  <div class="upload-panel">
+    <h3 class="upload-panel__title">{{ title }}</h3>
+    <p v-if="error" class="upload-panel__error">{{ error }}</p>
 
-        <!-- Image preview if an image file is uploaded -->
-        <div v-if="previewImage" class="imagePreviewWrapper" :style="{ 'background-image': `url(${previewImage})` }"></div>
+    <!-- The file input is now here, outside the v-if, but hidden via its class. -->
+    <!-- This ensures the ref is always available. -->
+    <input 
+      ref="fileInput"
+      type="file" 
+      :accept="fileType" 
+      @change="onChange" 
+      class="drop-zone__input"
+    >
 
-        <!-- PDF preview if a PDF file is uploaded -->
-        <div v-else-if="file && fileType === 'application/pdf'" class="filePreview">
-          <span class="fa fa-file-pdf-o" style="font-size: 72px; color: #ed4c4c; margin-bottom: 10px;"></span>
-          <p>{{ file.name }}</p>
-        </div>
+    <!-- State 1: Drop Zone -->
+    <div 
+      v-if="!file" 
+      :class="['drop-zone', dragging ? 'drop-zone--over' : '']" 
+      @dragenter.prevent="dragging = true" 
+      @dragover.prevent="dragging = true" 
+      @dragleave.prevent="dragging = false"
+      @drop.prevent="onDrop"
+      @click="$refs.fileInput.click()"
+    >
+      <div class="drop-zone__info">
+        <span class="drop-zone__icon fa fa-cloud-upload"></span>
+        <p class="drop-zone__text">Drop file here or click to upload</p>
+        <p class="drop-zone__subtext">
+          Supports: {{ acceptedExtensionsText }} | Max Size: {{ maxFileSizeMB }}MB
+        </p>
+      </div>
+    </div>
 
-        <!-- ZIP preview if a ZIP file is uploaded -->
-        <div v-else-if="file && fileType === 'application/zip,application/x-zip-compressed,application/octet-stream'" class="filePreview">
-          <span class="fa fa-file-zip-o" style="font-size: 72px; margin-bottom: 10px;"></span>
-          <p>{{ file.name }}</p>
-        </div>
+    <!-- State 2: File Preview & Actions -->
+    <div v-else class="file-preview-container">
+      <!-- Image Preview -->
+      <div v-if="previewImage" class="file-icon-preview">
+        <div class="image-preview" :style="{ 'background-image': `url(${previewImage})` }"></div>
+        <p class="file-name">{{ file.name }}</p>
+        <p class="file-size">{{ (file.size / 1024 / 1024).toFixed(2) }} MB</p>
+      </div>
+      
+      <!-- PDF Preview Icon -->
+      <div v-else-if="file.type === 'application/pdf'" class="file-icon-preview">
+        <span class="fa fa-file-pdf-o" style="font-size: 72px; color: #D33838;"></span>
+        <p class="file-name">{{ file.name }}</p>
+        <p class="file-size">{{ (file.size / 1024 / 1024).toFixed(2) }} MB</p>
+      </div>
 
-        <!-- Drop zone for file upload -->
-        <div v-if="!file" style="display: flex; justify-content: center; width: full;">
-          <div :class="['dropZone', dragging ? 'dropZone-over' : '']" @dragenter="dragging = true" @dragleave="dragging = false">
-            <div class="dropZone-info" @drag="onChange">
-              <span class="fa fa-cloud-upload dropZone-title" style="margin-right: 8px;"></span>
-              <span class="dropZone-title">Drop file or click to upload</span>
-              <div class="dropZone-upload-limit-info">
-                <br>
-                <div>extension support: {{ acceptedExtensionsText }}</div>
-                <div>maximum file size: {{ maxFileSizeMB }} MB</div>
-              </div>
-            </div>
-            <!-- Hidden file input for manual file selection -->
-            <input type="file" :accept="fileType" @change="onChange">
-          </div>
-        </div>
-
-        <!-- Uploaded file actions (submit or remove) -->
-        <div v-else style="display: flex; justify-content: center; width: full;">
-          <div class="dropZone-uploaded" style="margin: 10px; display:flex; flex-direction: row; align-items: center;">
-            <div class="dropZone-uploaded-info">
-              <button type="button" class="btn btn-primary removeFile" @click="submitFile">Submit</button>
-              <button type="button" class="btn btn-danger removeFile" @click="removeFile">Remove File</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Display uploaded file information -->
-        <div v-if="file" class="uploadedFile-info" style="margin-bottom: 10%; text-align: center;">
-          <div>Filename: {{ file.name }}</div>
-          <div>Filesize(bytes): {{ file.size }}</div>
-          <div>extension：{{ extension }}</div>
-        </div>
+      <!-- ZIP Preview Icon -->
+      <div v-else-if="file.type.includes('zip') || file.name.endsWith('.zip')" class="file-icon-preview">
+        <span class="fa fa-file-zip-o" style="font-size: 72px; color: #E8A133;"></span>
+        <p class="file-name">{{ file.name }}</p>
+        <p class="file-size">{{ (file.size / 1024 / 1024).toFixed(2) }} MB</p>
+      </div>
+      
+      <!-- Action Buttons -->
+      <div class="button-group" style="margin-top: 20px;">
+        <button type="button" class="btn btn--primary" @click="submitFile">Submit</button>
+        <button type="button" class="btn btn--secondary" @click="removeFile">Remove File</button>
       </div>
     </div>
   </div>
@@ -66,206 +66,247 @@
 
 <script>
 export default {
-  name: 'FileUpload',
+  name: 'UploadFile',
   props: {
-    // Accepted file types (e.g., 'image/*', 'application/pdf', 'application/zip')
-    fileType: {
-      type: String,
-      required: true,
-    },
-    // Maximum file size in MB
-    maxFileSizeMB: {
-      type: Number,
-      default: 5,
-    },
-    // Title of the uploader
-    title: {
-      type: String,
-      default: 'File Uploader',
-    },
+    fileType: { type: String, required: true },
+    maxFileSizeMB: { type: Number, default: 5 },
+    title: { type: String, default: 'File Uploader' },
   },
   data() {
     return {
-      file: '', // Uploaded file object
-      dragging: false, // Dragging state for drop zone
-      previewImage: null, // Preview image URL for image files
+      file: null,
+      dragging: false,
+      previewImage: null,
+      error: '',
     };
   },
   computed: {
-    // Compute accepted file extensions for display
-    acceptedExtensions() {
-      if (!this.fileType) {
-        return [];
-      }
+    acceptedExtensionsText() {
+      if (!this.fileType) return '';
       return this.fileType
-        .split(' ')
-        .map((type) => {
-          if (type === 'image/*') {
-            return 'jpg, png, jpeg';
-          }
-          if (type === 'application/pdf') {
-            return 'pdf';
-          }
-          if (type === 'application/zip,application/x-zip-compressed,application/octet-stream' ) {
-            return 'zip';
-          }
-          const parts = type.split('/');
-          if (parts.length === 2) {
-            return parts[1];
-          }
-          if (type.startsWith('.')) {
-            return type.substring(1);
-          }
-          return type;
+        .split(',')
+        .map(type => {
+          if (type.trim() === 'image/*') return 'JPG, PNG';
+          if (type.trim() === 'application/pdf') return 'PDF';
+          if (type.trim().includes('zip')) return 'ZIP';
+          return type.split('/')[1]?.toUpperCase() || type;
         })
         .join(', ');
     },
-    // Text representation of accepted extensions
-    acceptedExtensionsText() {
-      return this.acceptedExtensions;
-    },
-    // Extract file extension from uploaded file
-    extension() {
-      return this.file ? this.file.name.split('.').pop() : '';
-    },
-    // Maximum file size in bytes
-    maxFileSize() {
+    maxFileSizeBytes() {
       return this.maxFileSizeMB * 1024 * 1024;
     },
   },
   methods: {
-    // Handle file input change or drop
-    onChange(e) {
-      var files = e.target.files || e.dataTransfer.files;
-
-      if (!files.length) {
-        this.dragging = false;
-        return;
-      }
+    onDrop(e) {
+      this.dragging = false;
+      const files = e.dataTransfer.files;
+      if (!files || files.length === 0) return;
       this.createFile(files[0]);
     },
-    // Validate and set the uploaded file
+    onChange(e) {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+      this.createFile(files[0]);
+    },
     createFile(file) {
-      const allowedTypes = this.fileType.split(',').map((type) => type.trim());
-      const isFileTypeAllowed = allowedTypes.some((allowedType) => {
-        if (allowedType === 'image/*') {
-          return file.type.startsWith('image/');
-        }
-        return file.type === allowedType;
+      this.error = ''; // Reset error on new file selection
+
+      // Validate file size
+      if (file.size > this.maxFileSizeBytes) {
+        this.error = `File exceeds max size of ${this.maxFileSizeMB}MB.`;
+        return;
+      }
+
+      // Validate file type
+      const allowedTypes = this.fileType.split(',').map(t => t.trim());
+      const isValidType = allowedTypes.some(type => {
+        if (type === 'image/*') return file.type.startsWith('image/');
+        if (type.includes('zip')) return file.name.endsWith('.zip') || file.type.includes('zip');
+        return file.type === type;
       });
 
-      if (!isFileTypeAllowed) {
-        alert(`Invalid file type. Please upload a file with one of the following types: ${this.acceptedExtensionsText}`);
-        this.dragging = false;
+      if (!isValidType) {
+        this.error = `Invalid file type. Please upload: ${this.acceptedExtensionsText}`;
         return;
       }
-
-      if (file.size > this.maxFileSize) {
-        alert(`Please check file size. It should not exceed ${this.maxFileSizeMB} MB.`);
-        this.dragging = false;
-        return;
-      }
+      
       this.file = file;
-      this.dragging = false;
 
-      console.log(this.file);
-
-      // Generate preview for image files
+      // Create image preview
       if (this.file.type.startsWith('image/')) {
-        this.previewImage = URL.createObjectURL(this.file);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          this.previewImage = e.target.result;
+        };
+        reader.readAsDataURL(this.file);
       } else {
         this.previewImage = null;
       }
     },
-    // Emit the uploaded file to the parent component
     submitFile() {
-      this.$emit('newFile', this.file);
+      if (this.file) {
+        this.$emit('newFile', this.file);
+        // Do not clear the file here, parent component might need to show it's been processed.
+        // Parent component can call a method on this component to clear if needed.
+      }
     },
-    // Remove the uploaded file
     removeFile() {
-      this.file = '';
+      this.file = null;
       this.previewImage = null;
+      this.error = '';
+      // Reset the hidden file input so the same file can be selected again
+      // This will now work because the ref is always present.
+      if (this.$refs.fileInput) {
+        this.$refs.fileInput.value = '';
+      }
     },
   },
 };
 </script>
 
 <style scoped>
-/* Styles for the drop zone */
-.dropZone {
-  border: 2px dashed #ccc;
-  border-radius: 10px;
-  padding: 2px;
-  text-align: center;
-  cursor: pointer;
-  width: 300px; /* Adjust width as needed */
-}
-
-/* Highlight drop zone when dragging */
-.dropZone-over {
-  border-color: #c73c8be2;
-  background-color: #f0f0f9;
-}
-
-/* Drop zone informational text */
-.dropZone-info {
-  color: #999;
-}
-
-/* Drop zone title styling */
-.dropZone-title {
-  font-size: 1.2em;
-}
-
-/* Drop zone upload limit information */
-.dropZone-upload-limit-info {
-  font-size: 0.9em;
-  color: #666;
-}
-
-/* Hidden file input styling */
-.dropZone input[type='file'] {
-  position: absolute;
-  top: 0;
-  left: 0;
+/* Main Panel */
+.upload-panel {
   width: 100%;
-  height: 100%;
-  opacity: 0;
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 25px;
+  text-align: center;
+  border: 1px solid #e9ecef;
+}
+.upload-panel__title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #343a40;
+  margin: 0 0 15px 0;
+}
+.upload-panel__error {
+  color: #dc3545;
+  font-weight: 500;
+  background-color: #fbebed;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+}
+
+/* Drop Zone Styling */
+.drop-zone {
+  border: 2px dashed #ced4da;
+  border-radius: 10px;
+  padding: 40px 20px;
   cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  position: relative;
+}
+.drop-zone:hover {
+  border-color: #158be3;
+  background-color: #f8f9fa;
+}
+.drop-zone--over {
+  border-color: #158be3;
+  background-color: #e6f2ff;
+}
+.drop-zone__info {
+  color: #6c757d;
+}
+.drop-zone__icon {
+  font-size: 40px;
+  color: #158be3;
+}
+.drop-zone__text {
+  font-size: 18px;
+  font-weight: 500;
+  margin: 10px 0 5px 0;
+  color: #495057;
+}
+.drop-zone__subtext {
+  font-size: 14px;
+  margin: 0;
+}
+.drop-zone__input {
+  display: none;
 }
 
-/* Uploaded file container styling */
-.dropZone-uploaded {
-  text-align: center;
+/* File Preview Styling */
+.file-preview-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
 }
-
-/* Image preview container styling */
-.imagePreviewWrapper {
-  width: 200px; /* Adjust as needed */
-  height: 200px; /* Adjust as needed */
-  margin: 10px auto;
-  background-size: contain;
-  background-repeat: no-repeat;
+.image-preview {
+  width: 100%;
+  max-width: 250px;
+  height: 250px;
+  background-size: cover;
   background-position: center;
-  border: 1px solid #eee;
-  border-radius: 5px;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
 }
-
-/* PDF file preview styling */
-.filePreview {
+.file-icon-preview {
+  width:100%;
+  max-width: 250px;
   text-align: center;
-  margin: 20px auto;
+}
+.file-icon-preview .fa {
+  font-size: 72px;
+}
+.file-name {
+  font-weight: 600;
+  color: #343a40;
+  margin-top: 10px;
+  margin-bottom: 5px;
+  word-break: break-all;
+}
+.file-size {
+  font-size: 14px;
+  color: #6c757d;
+  margin: 0;
 }
 
-/* Uploaded file information styling */
-.uploadedFile-info {
+/* --- Buttons --- */
+.btn {
+  display: inline-block;
+  border: none;
+  padding: 12px 28px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
   text-align: center;
-  margin-top: 40px;
-  color: #555;
+  text-decoration: none;
+  transition: all 0.2s ease-in-out;
 }
-
-/* Remove file button styling */
-.removeFile {
-  margin: 10px;
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.btn--primary {
+  background-color: #158be3;
+  color: white;
+}
+.btn--primary:hover { background-color: #1172bb; }
+.btn--primary:disabled {
+  background-color: #a0cff2;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+.btn--secondary {
+  background-color: #6c757d;
+  color: white;
+}
+.btn--secondary:hover { background-color: #5a6268; }
+.btn--full-width {
+  width: 100%;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+.button-group {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 10px;
 }
 </style>

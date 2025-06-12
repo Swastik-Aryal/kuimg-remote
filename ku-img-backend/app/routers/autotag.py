@@ -297,7 +297,24 @@ async def train(
     tag: str = Body(..., description="tag for which the dataset is provided"),
 ):
     """
-    Train the dataset and return the trained model.
+    Train a model using a provided dataset for image classification with a specific tag.
+    Parameters:
+    dataset_key : str
+        Object key corresponding to the zipped dataset conforming to required standards.
+        The dataset should be a zip file containing properly organized images for training.
+    key : str
+        Output model info is uploaded to storage server with this key.
+        This key is used to store and later retrieve the trained model.
+    tag : str
+        The tag category for which the dataset is provided.
+        This defines the classification label that the model will learn to identify.
+    Returns:
+    tuple
+        A tuple containing the following evaluation metrics:
+        - test_accuracy (float): The model's accuracy on the test dataset
+        - f1 (float): The F1 score of the model
+        - precision (float): The precision score of the model
+        - recall (float): The recall score of the model
     """
 
     # write dataset into a temporary location
@@ -319,9 +336,10 @@ async def train(
 
     # build model
     try:
-        test_accuracy = generate_model(
+        test_accuracy, f1, precision, recall = generate_model(
             dataset_temp_loc, out_model_path, out_meta_path, img_dim=[64, 64], epochs=5
         )
+        print("from train", test_accuracy, f1, precision, recall)
     except Exception as e:
         err = f"Model Generation Failed. Raised {e.__class__.__name__}:{str(e)}"
         raise HTTPException(detail=err, status_code=400)
@@ -346,7 +364,7 @@ async def train(
     fs_conn.set(key, zip_content)
 
     # return key
-    return test_accuracy
+    return test_accuracy, f1, precision, recall
 
 
 ## added by shishir for GAN (Nigam Bishal code) ##
@@ -366,7 +384,19 @@ async def train_with_gan(
     tag: str = Body(..., description="tag for which the dataset is provided"),
 ):
     """
-    Train the dataset and return the trained model.
+    Individual GAN Training + CNN Train Endpoint (Alternative to Page2View. change the f.e. call to .. post('/autotag/ml/train/gan', data) if you use page2view for gan training + CNN training)
+    Parameters:
+    dataset_key : str
+        Object key corresponding to the zipped dataset conforming to required standards.
+        The dataset should be a zip file containing properly organized images for training.
+    key : str
+        Output model info is uploaded to storage server with this key.
+        This key is used to store and later retrieve the trained model.
+    tag : str
+        The tag category for which the dataset is provided.
+        This defines the classification label that the model will learn to identify.
+    Returns:
+    dict : {"accuracy": accu, "f1": f1, "precision": precision, "recall": recall}
     """
     name = f"{dataset_key}"
     dataset_key_GAN = f"{dataset_key}_GAN"
@@ -420,12 +450,14 @@ async def train_with_gan(
         save_with_other_dataset(
             Path(dataset_temp_loc), Path(new_images_path), tag=name, key=dataset_key_GAN
         )
-        model_key = await train(key=key, dataset_key=dataset_key_GAN, tag=tag)
+        accu, f1, precision, recall = await train(
+            key=key, dataset_key=dataset_key_GAN, tag=tag
+        )
     except Exception as e:
         err = f"Zip operation Failed. Raised {e.__class__.__name__}:{str(e)}"
         raise HTTPException(detail=err, status_code=400)
 
-    return model_key
+    return {"accuracy": accu, "f1": f1, "precision": precision, "recall": recall}
 
 
 ## added till here (GAN)
@@ -437,6 +469,16 @@ async def train_with_gan(
 async def model_train(tag):
     """
     Train the dataset and return the trained model.
+    Parameters:
+    tag : str
+    Returns:
+    tuple
+        A tuple containing the following evaluation metrics:
+        - test_accuracy (float): The model's accuracy on the test dataset
+        - f1 (float): The F1 score of the model
+        - precision (float): The precision score of the model
+        - recall (float): The recall score of the model
+
     """
     key = tag + "_model.zip"
     dataset_key = tag + "_dataset.zip"
@@ -459,7 +501,7 @@ async def model_train(tag):
 
     # build model
     try:
-        test_accuracy = generate_model(
+        test_accuracy, f1, precision, recall = generate_model(
             dataset_temp_loc, out_model_path, out_meta_path, img_dim=[64, 64], epochs=25
         )
     except Exception as e:
@@ -485,7 +527,7 @@ async def model_train(tag):
     # Upload to Storage Server
     fs_conn.set(key, zip_content)
 
-    return test_accuracy
+    return test_accuracy, f1, precision, recall
 
 
 from pydantic import BaseModel
@@ -506,6 +548,11 @@ async def autotag_img_fetch_train(tag_request: TagRequest):
     """
     Generate a dataset for the given specifications
     If target_key specified, uploads dataset to key. Else streams response
+
+    Parameters:
+    tag_request : TagRequest ({tag: str})
+    Returns:
+    dict : {"accuracy": accu, "f1": f1, "precision": precision, "recall": recall}
     """
     tag = tag_request.tag
     # Build arguments
@@ -617,9 +664,9 @@ async def autotag_img_fetch_train(tag_request: TagRequest):
 
     print("The Crawling is finished now training the model")
 
-    accu = await model_train(tag)
+    accu, f1, precision, recall = await model_train(tag)
 
-    return accu
+    return {"accuracy": accu, "f1": f1, "precision": precision, "recall": recall}
 
 
 # Function for extacting a files from a zip file to a specified location
@@ -695,6 +742,17 @@ async def autotag_img_fetch_train_userdata(
         True, description="Boolean to include/omit the internet crawled data"
     ),
 ):
+    """
+    Endpoint for training with user's dataset (with/wihout crawled data)
+
+    Parameters:
+    tag : str
+        Tag for which image dataset is being generated.
+    dataset : UploadFile (zipfile: containing images of only the tag)
+    use_crawled_data : bool (Boolean to include/omit the internet crawled data)
+    Returns:
+    dict : {"accuracy": accu, "f1": f1, "precision": precision, "recall": recall}
+    """
     # Build arguments
     dataset_loc = os.path.join(config.TEMP_AUTO_IMG_PATH, f"{tag}.data")
 
@@ -822,9 +880,9 @@ async def autotag_img_fetch_train_userdata(
 
     print("The Crawling is finished now training the model")
 
-    accu = await model_train(tag)
+    accu, f1, precision, recall = await model_train(tag)
 
-    return accu
+    return {"accuracy": accu, "f1": f1, "precision": precision, "recall": recall}
 
 
 ## added by shishir till here For Pipelining Crawl and Train CNN ##
@@ -838,7 +896,11 @@ class GanTagRequest(BaseModel):
 @router.post("/ml/train/gan_cnn")
 async def autotag_img_train_GAN(gan_tag_request: GanTagRequest):
     """
-    Train the dataset and return the trained model.
+    Use the dataset, train the GAN and return the trained model.
+    Parameters:
+    gan_tag_request : GanTagRequest ({tag: str})
+    Returns:
+    dict : {"accuracy": accu, "f1": f1, "precision": precision, "recall": recall}
     """
     tag = gan_tag_request.tag
     key = tag + "_model.zip"
@@ -897,12 +959,15 @@ async def autotag_img_train_GAN(gan_tag_request: GanTagRequest):
             Path(dataset_temp_loc), Path(new_images_path), tag=name, key=dataset_key_GAN
         )
 
-        model_key = await train(key=key, dataset_key=dataset_key_GAN, tag=tag)
+        accu, f1, precision, recall = await train(
+            key=key, dataset_key=dataset_key_GAN, tag=tag
+        )
+        print("from train gan", accu, f1, precision, recall)
     except Exception as e:
         err = f"Zip operation Failed. Raised {e.__class__.__name__}:{str(e)}"
         raise HTTPException(detail=err, status_code=400)
 
-    return model_key
+    return {"accuracy": accu, "f1": f1, "precision": precision, "recall": recall}
 
 
 ## added by shishir till here For Pipelining GAN Tran and Train CNN ##
@@ -917,7 +982,11 @@ class FetchGanTagRequest(BaseModel):
 @router.post("/ml/train/fetch_gan_cnn")
 async def autotag_img_fetch_train_GAN(fetch_gan_tag_request: FetchGanTagRequest):
     """
-    Crawl and Train the dataset and return the trained model validation accuracy.
+    Crawl and Train the dataset, train the gan, train the model,  return the trained model validation accuracy.
+    Parameters:
+    fetch_gan_tag_request : FetchGanTagRequest ({tag: str})
+    Returns:
+    dict : {"accuracy": accu, "f1": f1, "precision": precision, "recall": recall}
     """
     tag = fetch_gan_tag_request.tag
 
@@ -1030,9 +1099,16 @@ async def autotag_img_fetch_train_GAN(fetch_gan_tag_request: FetchGanTagRequest)
 
     print("The Crawling is finished now training the model")
 
-    accu = await autotag_img_train_GAN(GanTagRequest(tag=tag))
+    res = await autotag_img_train_GAN(GanTagRequest(tag=tag))
+    accu, f1, precision, recall = (
+        res["accuracy"],
+        res["f1"],
+        res["precision"],
+        res["recall"],
+    )
+    print("from gan cnn", accu, f1, precision, recall)
 
-    return accu
+    return {"accuracy": accu, "f1": f1, "precision": precision, "recall": recall}
 
 
 ## added by shishir till here For Pipelining CRAWL, run Gan and Train CNN ##
@@ -1040,6 +1116,15 @@ async def autotag_img_fetch_train_GAN(fetch_gan_tag_request: FetchGanTagRequest)
 
 @router.post("/model/upload-pdf/")
 async def upload_pdf(file: UploadFile = File(...)):
+    """
+    Endpoint to upload a PDF file and extract keywords from it.
+    Parameters:
+    file : UploadFile
+        The PDF file to be uploaded.
+    Returns:
+    dict : {"keywords": {keyword: {"score": score, "exists": bool}}}
+        A dictionary containing extracted keywords with their scores and existence status.
+    """
     if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Invalid file type.")
 
@@ -1050,7 +1135,7 @@ async def upload_pdf(file: UploadFile = File(...)):
         tmp_path = tmp.name
 
     print("Pdf temporarily saved at ", tmp_path)
-    keyword_data = extract_keywords_from_pdf(tmp_path, numOfKeywords=5)
+    keyword_data = extract_keywords_from_pdf(tmp_path, numOfKeywords=3)
 
     if os.path.exists(tmp_path):
         os.remove(tmp_path)
@@ -1080,6 +1165,20 @@ async def model_register(
     ),
     group: str = Body(None, description="A key to orgainize models"),
 ):
+    """
+    Register a model using the provided model key and template.
+    Parameters:
+        model_key : str
+            Object key which contains the model data in standard format.
+            The model data should be a zip file containing meta.json and model.h5.
+        template : str
+            A standard template as returned by /model/templates/list.
+            This defines the structure and parameters for the model.
+        group : str
+            A key to organize models. If not provided, defaults to None.
+    Returns:
+        str : "SUCCESS"
+    """
     # write zip into a temporary target location
     zip_loc = os.path.join(
         config.TEMP_DATA_PATH,
