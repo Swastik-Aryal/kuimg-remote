@@ -64,18 +64,18 @@ module.exports = defineConfig({
   },
 
   chainWebpack: config => {
-    // Remove prefetch for better initial load
-    config.plugins.delete('prefetch')
-    
-    // Keep preload for critical resources
-    config.plugin('preload').tap(() => [
-      {
-        rel: 'preload',
-        include: 'initial',
-        fileBlacklist: [/\.map$/, /hot-update\.js$/]
-      }
-    ])
-    
+  // Remove prefetch to improve initial load
+    config.plugins.delete('prefetch');
+
+    // Only tap preload plugin if it exists
+    if (config.plugins.has('preload')) {
+      config.plugin('preload').tap(args => {
+        args[0].fileBlacklist = [/\.map$/, /hot-update\.js$/];
+        args[0].include = 'initial';
+        return args;
+      });
+    }
+
     // Optimize images
     config.module
       .rule('images')
@@ -85,6 +85,6 @@ module.exports = defineConfig({
       .options({
         disable: process.env.NODE_ENV === 'development'
       })
-      .end()
+      .end();
   }
 })
