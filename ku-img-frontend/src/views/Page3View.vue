@@ -145,8 +145,6 @@ export default {
       thresholds: {
         accuracy: 95,
         f1: 88,
-        recall: 85,
-        precision: 85,
       },
       manualCheckBaseline: 60,
 

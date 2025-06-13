@@ -2,7 +2,6 @@
   <main class="page-container">
     <div class="content-wrapper" style="max-width: 1200px;">
 
-      <!-- Initial Upload State -->
       <div v-if="showUpload" class="panel animated-fade-in" style="max-width: 800px;">
         <UploadFile fileType="application/pdf" title="PDF Uploader" :maxFileSizeMB="100"
           @newFile="extractKeywords($event)" />
@@ -11,7 +10,6 @@
       <ClipLoader :loading="loading && !showKeywordsSelect && !trainingState" size="100px"
         msg="Extracting Keywords from PDF..." style="margin: 100px auto;" />
 
-      <!-- Configuration Panel State -->
       <div v-if="showKeywordsSelect" class="panel animated-fade-in" style="max-width: 800px;">
         <h2 class="panel__title">Training Configuration</h2>
         <p class="panel__description">The following keywords were extracted from the PDF. Models will be trained for all
@@ -50,89 +48,90 @@
           Training for {{ selectedKeywords.length }} Keywords</button>
       </div>
 
-      <!-- Main Training Dashboard State -->
       <div v-if="showKeywordsState || trainingState" class="training-dashboard animated-fade-in">
-        <!-- Left Panel: Overall Status Grid -->
         <div class="panel status-panel">
           <h2 class="panel__title">Training Status</h2>
           <div class="status-grid">
-            <div v-for="(info, keyword) in keywords" :key="keyword" class="status-grid__row">
-              <div class="status-grid__cell status-grid__cell--keyword"><b>{{ keyword }}</b></div>
-              <div class="status-grid__cell status-grid__cell--status">
-                <span v-if="trainedResults[keyword]?.status !== 'success'" class="status-badge"
-                  :class="getKeywordClass(keyword, info)">
-                  {{ getKeywordStatus(keyword, info) }}
-                </span>
-                <div v-else class="success-details">
-                  <span class="status-badge" :class="getKeywordClass(keyword, info)">
+            <template v-for="(info, keyword) in keywords" :key="keyword">
+
+              <div class="status-grid__row">
+                <div class="status-grid__cell status-grid__cell--keyword"><b>{{ keyword }}</b></div>
+                <div class="status-grid__cell status-grid__cell--status">
+                  <span v-if="trainedResults[keyword]?.status !== 'success'" class="status-badge"
+                    :class="getKeywordClass(keyword, info)">
                     {{ getKeywordStatus(keyword, info) }}
                   </span>
-                  <div class="metrics-container">
-                    <div v-for="(value, metric) in trainedResults[keyword].metrics" :key="metric" class="metric-row">
-                      <span class="metric-label">{{ metric }}</span>
-                      <div class="progress-bar-container">
-                        <div class="progress-bar" :style="{ width: value * 100 + '%' }"></div>
+                  <div v-else class="success-details">
+                    <span class="status-badge" :class="getKeywordClass(keyword, info)">
+                      {{ getKeywordStatus(keyword, info) }}
+                    </span>
+                    <div class="metrics-container">
+                      <div v-for="(value, metric) in trainedResults[keyword].metrics" :key="metric" class="metric-row">
+                        <span class="metric-label">{{ metric }}</span>
+                        <div class="progress-bar-container">
+                          <div class="progress-bar" :style="{ width: value * 100 + '%' }"></div>
+                        </div>
+                        <span class="metric-value">{{ (value * 100).toFixed(1) }}%</span>
                       </div>
-                      <span class="metric-value">{{ (value * 100).toFixed(1) }}%</span>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+
+              <div v-if="trainingState && currentTraining === keyword" class="training-panel-nested animated-fade-in">
+                <h2 class="panel__title" style="font-size: 22px; margin-bottom: 20px;">Training Model for "{{
+                  this.currentTraining }}"</h2>
+                <ClipLoader :loading="loading && !testFile" size="80px" :msg="loadingText" style="margin: 40px auto;" />
+
+                <div v-if="modelSaveError" class="alert alert--error">
+                  <p>Strategy failed. Attempting next.</p>
+                </div>
+
+                <div v-if="showUserDataUpload" class="action-box">
+                  <h3 class="action-box__title">Additional Data Required</h3>
+                  <p class="action-box__description">
+                    Upload a ZIP file with additional images for "{{ this.currentTraining }}" to improve the model.
+                  </p>
+                  <UploadFile fileType="application/zip,application/x-zip-compressed,application/octet-stream"
+                    title="ZIP Uploader" :maxFileSizeMB="500" @newFile="processUserData($event)" />
+                </div>
+
+                <div v-if="testFile" class="action-box">
+                  <h3 class="action-box__title">Manual Confirmation Needed</h3>
+                  <div class="alert alert--warning">
+                    <p class="alert__title">Metrics Below Threshold:</p>
+                    <ul class="metric-list">
+                      <li v-for="metric in failingMetrics" :key="metric.name" class="metric-list__item">
+                        <span class="metric-name">{{ metric.name }}:</span>
+                        <span class="metric-value metric-value--actual">{{ (metric.value * 100).toFixed(1) }}%</span>
+                        <span class="metric-value metric-value--threshold">(Threshold: {{ metric.threshold }}%)</span>
+                      </li>
+                    </ul>
+                  </div>
+                  <p class="action-box__description">Please upload a test image to verify its predictions.</p>
+                  <UploadFile v-if="!loading" fileType="image/*" title="Manual Test Image" :maxFileSizeMB="5"
+                    @newFile="onTestFileChange($event)" />
+                  <ClipLoader :loading="loading" size="60px" :msg="loadingText" style="margin: 20px auto;" />
+                </div>
+
+                <div v-if="showTestTags" class="action-box">
+                  <h3 class="action-box__title">Test Result</h3>
+                  <div class="test-result">
+                    <span>Predicted Tags:</span>
+                    <span class="test-result__tags">{{ test_tags.join(', ') || 'None' }}</span>
+                  </div>
+                  <p class="action-box__description" style="margin-top: 20px;">Based on this result, would you like to
+                    save this model or re-train?</p>
+                  <div class="button-group">
+                    <button @click="manualChoice = 'save'" class="btn btn--primary">Save Model</button>
+                    <button @click="manualChoice = 'retrain'" class="btn btn--secondary">Re-Train</button>
+                  </div>
+                </div>
+              </div>
+            </template>
           </div>
           <button v-if="currentTraining === null && showKeywordsState" @click="resetPage" class="btn btn--primary"
             style="margin-top: 30px;">Done</button>
-        </div>
-
-        <!-- Right Panel: Active Training Details -->
-        <div v-if="trainingState" class="panel training-panel">
-          <h2 class="panel__title">Training Model for "{{ this.currentTraining }}"</h2>
-          <ClipLoader :loading="loading && !testFile" size="80px" :msg="loadingText" style="margin: 40px auto;" />
-
-          <div v-if="modelSaveError" class="alert alert--error">
-            <p>Strategy failed. Attempting next.</p>
-          </div>
-
-          <div v-if="showUserDataUpload" class="action-box">
-            <h3 class="action-box__title">Additional Data Required</h3>
-            <p class="action-box__description">
-              Upload a ZIP file with additional images for "{{ this.currentTraining }}" to improve the model.
-            </p>
-            <UploadFile fileType="application/zip,application/x-zip-compressed,application/octet-stream"
-              title="ZIP Uploader" :maxFileSizeMB="500" @newFile="processUserData($event)" />
-          </div>
-
-          <div v-if="testFile" class="action-box">
-            <h3 class="action-box__title">Manual Confirmation Needed</h3>
-            <div class="alert alert--warning">
-              <p class="alert__title">Metrics Below Threshold:</p>
-              <ul class="metric-list">
-                <li v-for="metric in failingMetrics" :key="metric.name" class="metric-list__item">
-                  <span class="metric-name">{{ metric.name }}:</span>
-                  <span class="metric-value metric-value--actual">{{ (metric.value * 100).toFixed(1) }}%</span>
-                  <span class="metric-value metric-value--threshold">(Threshold: {{ metric.threshold }}%)</span>
-                </li>
-              </ul>
-            </div>
-            <p class="action-box__description">Please upload a test image to verify its predictions.</p>
-            <UploadFile v-if="!loading" fileType="image/*" title="Manual Test Image" :maxFileSizeMB="5"
-              @newFile="onTestFileChange($event)" />
-            <ClipLoader :loading="loading" size="60px" :msg="loadingText" style="margin: 20px auto;" />
-          </div>
-
-          <div v-if="showTestTags" class="action-box">
-            <h3 class="action-box__title">Test Result</h3>
-            <div class="test-result">
-              <span>Predicted Tags:</span>
-              <span class="test-result__tags">{{ test_tags.join(', ') || 'None' }}</span>
-            </div>
-            <p class="action-box__description" style="margin-top: 20px;">Based on this result, would you like to save
-              this model or re-train?</p>
-            <div class="button-group">
-              <button @click="manualChoice = 'save'" class="btn btn--primary">Save Model</button>
-              <button @click="manualChoice = 'retrain'" class="btn btn--secondary">Re-Train</button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -167,10 +166,8 @@ export default {
 
       // NEW: Thresholds object for multiple sliders
       thresholds: {
-        accuracy: 90,
+        accuracy: 95,
         f1: 88,
-        recall: 85,
-        precision: 85,
       },
       manualCheckBaseline: 60, // Fixed baseline for manual checks
 
@@ -323,7 +320,6 @@ export default {
       try {
         const response = await axios.post('/autotag/img/fetch_train', data);
         return response.data; // Return the full metrics object
-
       } catch (error) { console.error('Error in fetchTrain:', error); return undefined; }
       finally { this.loading = false; }
     },
@@ -349,7 +345,6 @@ export default {
       axios.post('/autotag/img/fetch_train_userdata', data)
         .then(response => {
           if (this.userDataPromiseResolver) {
-
             this.userDataPromiseResolver(response.data);  // Resolve the promise
           }
         })
@@ -467,7 +462,6 @@ export default {
 /* --- Main Layout & Font --- */
 .page-container {
   background-color: #f8f9fa;
-  /* Unified light background */
   min-height: 100vh;
   padding: 40px 20px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -476,7 +470,6 @@ export default {
 
 .content-wrapper {
   max-width: 800px;
-  /* Standardized max-width */
   margin: 0 auto;
 }
 
@@ -504,7 +497,6 @@ export default {
   background-color: #ffffff;
   border-radius: 16px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
-  /* Softer shadow */
   border: 1px solid #e9ecef;
   text-align: center;
 }
@@ -831,19 +823,12 @@ export default {
 }
 
 /* --- Training Dashboard --- */
-.training-dashboard {
-  display: flex;
-  gap: 20px;
-  align-items: flex-start;
-}
 
 .status-panel {
   flex-grow: 1;
 }
 
-.training-panel {
-  flex-grow: 1;
-}
+/* REMOVED .training-panel as it no longer exists as a separate entity */
 
 .status-grid {
   display: flex;
@@ -859,6 +844,7 @@ export default {
   border: 1px solid #e9ecef;
   border-radius: 8px;
   overflow: hidden;
+  z-index: 1; /* Keep it above the nested panel */
 }
 
 .status-grid__cell {
@@ -874,6 +860,17 @@ export default {
 
 .status-grid__cell--status {
   background-color: #fff;
+}
+
+/* --- NEW: Nested Training Panel --- */
+.training-panel-nested {
+  padding: 25px 30px 30px 30px;
+  background-color: #ffffff;
+  border: 1px solid #e9ecef;
+  border-top: none; /* Remove top border as it's connected */
+  margin-top: -8px; /* Pull it up to connect with the row above */
+  border-radius: 0 0 12px 12px; /* Round only the bottom corners */
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.03) inset; /* Inner shadow for depth */
 }
 
 /* Success Metrics & Progress Bars */
