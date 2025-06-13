@@ -119,73 +119,190 @@ def sample_chart(X, Y, tags):
     return plt
 
 
-def train(model_path, X_train, Y_train, X_test, Y_test, img_dim, epochs):
-    # Load a pre-trained model (e.g., VGG16)
-    base_model = tf.keras.applications.VGG16(
-        weights="imagenet",  # Load ImageNet weights
-        include_top=False,  # Exclude the top classification layers
-        input_shape=(*img_dim, 3),  # Match your input image dimensions
-    )
+def get_base_model(model_name, img_dim, num_classes):
+    """
+    Get the specified pre-trained model
 
-    # Freeze the base model layers to prevent their weights from being updated
+    Args:
+        model_name: One of 'efficientnet', 'resnet50', 'resnet101', 'vgg16', 'vgg19'
+        img_dim: Image dimensions (width, height)
+        num_classes: Number of output classes
+
+    Returns:
+        base_model: The pre-trained model without top layers
+        model_info: Dictionary with model-specific information
+    """
+    input_shape = (*img_dim, 3)
+
+    if model_name.lower() == "efficientnet":
+        base_model = tf.keras.applications.EfficientNetB0(
+            weights="imagenet", include_top=False, input_shape=input_shape
+        )
+        model_info = {"name": "EfficientNetB0", "dense_units": 128, "dropout_rate": 0.2}
+
+    elif model_name.lower() == "resnet50":
+        base_model = tf.keras.applications.ResNet50(
+            weights="imagenet", include_top=False, input_shape=input_shape
+        )
+        model_info = {"name": "ResNet50", "dense_units": 256, "dropout_rate": 0.3}
+
+    elif model_name.lower() == "resnet101":
+        base_model = tf.keras.applications.ResNet101(
+            weights="imagenet", include_top=False, input_shape=input_shape
+        )
+        model_info = {"name": "ResNet101", "dense_units": 256, "dropout_rate": 0.3}
+
+    elif model_name.lower() == "vgg16":
+        base_model = tf.keras.applications.VGG16(
+            weights="imagenet", include_top=False, input_shape=input_shape
+        )
+        model_info = {"name": "VGG16", "dense_units": 64, "dropout_rate": 0.5}
+
+    elif model_name.lower() == "vgg19":
+        base_model = tf.keras.applications.VGG19(
+            weights="imagenet", include_top=False, input_shape=input_shape
+        )
+        model_info = {"name": "VGG19", "dense_units": 64, "dropout_rate": 0.5}
+
+    else:
+        raise ValueError(
+            f"Unsupported model: {model_name}. Choose from: efficientnet, resnet50, resnet101, vgg16, vgg19"
+        )
+
+    return base_model, model_info
+
+
+def train(
+    model_path,
+    X_train,
+    Y_train,
+    X_test,
+    Y_test,
+    img_dim,
+    epochs,
+    model_name="efficientnet",
+):
+    """
+    Train a model using transfer learning
+
+    Args:
+        model_path: Path to save the best model
+        X_train, Y_train: Training data and labels
+        X_test, Y_test: Test data and labels
+        img_dim: Image dimensions
+        epochs: Number of training epochs
+        model_name: Pre-trained model to use ('efficientnet', 'resnet50', 'resnet101', 'vgg16', 'vgg19')
+    """
+    num_classes = len(np.unique(Y_train))
+
+    # Get the base model
+    base_model, model_info = get_base_model(model_name, img_dim, num_classes)
+
+    # Freeze the base model layers
     base_model.trainable = False
 
-    # Add new classifier layers on top of the base model
+    # Build the model with appropriate architecture for each base model
     model = models.Sequential(
         [
             base_model,
-            layers.Flatten(),
-            layers.Dense(64, activation="relu"),
-            layers.Dense(2),  # Output layer with 2 neurons for your 2 classes
+            layers.GlobalAveragePooling2D(),  # Better than Flatten for most modern architectures
+            layers.Dropout(model_info["dropout_rate"]),
+            layers.Dense(model_info["dense_units"], activation="relu"),
+            layers.Dropout(0.2),
+            layers.Dense(num_classes),  # Dynamic number of classes
         ]
     )
 
-    # Compile the model with appropriate optimizer, loss, and metrics
+    # Compile the model
     model.compile(
-        optimizer="adam",
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
         loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
         metrics=["accuracy"],
     )
+
+    print(f"Using {model_info['name']} as base model")
+    print(f"Model summary:")
+    model.summary()
 
     # Define callbacks
     checkpoint = tf.keras.callbacks.ModelCheckpoint(
         model_path, monitor="val_accuracy", save_best_only=True, mode="max", verbose=1
     )
+
     early_stopping = tf.keras.callbacks.EarlyStopping(
-        monitor="val_accuracy", patience=5, mode="max", verbose=1
+        monitor="val_accuracy",
+        patience=7,
+        mode="max",
+        verbose=1,
+        restore_best_weights=True,
     )
 
-    # Train the model (only the newly added layers will be trained)
+    reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(
+        monitor="val_loss", factor=0.2, patience=3, min_lr=0.0001, verbose=1
+    )
+
+    # Train the model
     history = model.fit(
         X_train,
         Y_train,
         epochs=epochs,
         validation_data=(X_test, Y_test),
-        callbacks=[checkpoint, early_stopping],
+        callbacks=[checkpoint, early_stopping, reduce_lr],
+        verbose=1,
     )
 
-    return model
+    return model, model_info
 
 
-def generate_model(dataset, model_path, meta_path, img_dim=(64, 64), epochs=25):
+def generate_model(
+    dataset,
+    model_path,
+    meta_path,
+    img_dim=(64, 64),
+    epochs=25,
+    model_name="efficientnet",
+):
     """
-    dataset must conform to the following standards :
+    Generate and train a model using transfer learning
+
+    Args:
+        dataset: Path to zipped dataset
+        model_path: Path to save the trained model
+        meta_path: Path to save model metadata
+        img_dim: Image dimensions (width, height)
+        epochs: Number of training epochs
+        model_name: Pre-trained model to use ('efficientnet', 'resnet50', 'resnet101', 'vgg16', 'vgg19')
+
+    Dataset must conform to the following standards:
       - it must be a zipped file where each extracted directory is a tag
-      - each directory can have images in any number of subdirectories.
-      -  However, all images will be associated with the main tag
+      - each directory can have images in any number of subdirectories
+      - However, all images will be associated with the main tag
     """
     (X_train, X_test, Y_train, Y_test), tags = parse_dataset(dataset, img_dim=img_dim)
 
-    # # chart
-    # plt = sample_chart(X_train, Y_train, tags)
-    # plt.savefig('img.png')
+    print(
+        f"Dataset loaded: {len(X_train)} training samples, {len(X_test)} test samples"
+    )
+    print(f"Classes: {tags}")
 
-    # train
-    model = train(
-        model_path, X_train, Y_train, X_test, Y_test, img_dim=img_dim, epochs=epochs
+    # # Uncomment to generate sample chart
+    # plt = sample_chart(X_train, Y_train, tags)
+    # plt.savefig('sample_images.png')
+    # plt.close()
+
+    # Train the model
+    model, model_info = train(
+        model_path,
+        X_train,
+        Y_train,
+        X_test,
+        Y_test,
+        img_dim=img_dim,
+        epochs=epochs,
+        model_name=model_name,
     )
 
-    # evaluate
+    # Evaluate the model
     test_loss, test_acc = model.evaluate(X_test, Y_test, verbose=2)
 
     predictions = model.predict(X_test)
@@ -196,24 +313,40 @@ def generate_model(dataset, model_path, meta_path, img_dim=(64, 64), epochs=25):
     precision = precision_score(Y_test, predicted_classes, average="weighted")
     recall = recall_score(Y_test, predicted_classes, average="weighted")
 
-    # write meta file
+    # Create metadata
     meta = {
+        "base_model": model_info["name"],
+        "model_name": model_name,
         "tags": tags,
-        "dt": datetime.now().strftime("%Y-%m-%d"),
+        "num_classes": len(tags),
+        "dt": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "img_dim": img_dim,
         "training_size": len(X_train),
         "training_epochs": epochs,
         "testing_size": len(X_test),
-        "testing_acc": test_acc,
-        "f1_score": f1,
-        "precision": precision,
-        "recall": recall,
+        "testing_acc": float(test_acc),
+        "testing_loss": float(test_loss),
+        "f1_score": float(f1),
+        "precision": float(precision),
+        "recall": float(recall),
+        "model_architecture": {
+            "dense_units": model_info["dense_units"],
+            "dropout_rate": model_info["dropout_rate"],
+        },
     }
-    with open(meta_path, "w") as f:
-        f.write(json.dumps(meta, indent=4))
 
-    # # write model_file
-    # model.save(model_path)
+    # Save metadata
+    with open(meta_path, "w") as f:
+        json.dump(meta, f, indent=4)
+
+    print(f"\nTraining completed!")
+    print(f"Test Accuracy: {test_acc:.4f}")
+    print(f"F1 Score: {f1:.4f}")
+    print(f"Precision: {precision:.4f}")
+    print(f"Recall: {recall:.4f}")
+    print(f"Model saved to: {model_path}")
+    print(f"Metadata saved to: {meta_path}")
+
     return test_acc, f1, precision, recall
 
 
@@ -227,4 +360,13 @@ if __name__ == "__main__":
         current_path, "test", "New_finetune_models", "chairModel.json"
     )
 
-    generate_model(dataset, model_output, meta_path, img_dim=[64, 64], epochs=25)
+    # You can now specify different models:
+    # 'efficientnet' (default), 'resnet50', 'resnet101', 'vgg16', 'vgg19'
+    generate_model(
+        dataset=dataset,
+        model_output=model_output,
+        meta_path=meta_path,
+        img_dim=[64, 64],
+        epochs=25,
+        model_name="efficientnet",  # Change this to use different models
+    )
