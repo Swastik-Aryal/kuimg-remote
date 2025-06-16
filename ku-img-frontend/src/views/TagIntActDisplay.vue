@@ -9,7 +9,7 @@
 <script>
 //npm install vue-plotly
 import axios from 'axios';
-import Plotly from 'plotly.js-dist';
+import Plotly from 'plotly.js-basic-dist';
 
 export default {
   name: 'TagIntActDisplay',
