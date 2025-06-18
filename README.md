@@ -1,5 +1,7 @@
 # kuimg-remote
+This is the server version of the ku-img app. 
 
+P.S. This will not run locally.
 ## Steps
 
 1. Frontend
